@@ -278,10 +278,15 @@ class MyClient(discord.Client):
                         channel = client.get_channel(845345224461123619)
                         messages = await channel.history(limit=200).flatten()
                         for msg in messages:
-                            res = msg.content.find(str(result))
-                            if res != -1:
-                                text = text[:text.find("Владелец")] + '\n' + name + ': ' + price + 'АР -' + amount + 'штук' + text[text.find("Владелец"):]
-                                await msg.edit(content = text)
+                            res1 = msg.content.find(str(result))
+                            res = msg.content
+                            if res1 != -1:
+                                if res.find('Пока') == -1:
+                                    m = res[:res.find("Владелец")] + name + ': ' + price + 'АР -' + amount + 'штук\n' + res[res.find("Владелец"):]
+                                    await msg.edit(content = m)
+                                else:
+                                    m = res[:res.find("Пока")] + name + ': ' + price + 'АР -' + amount + 'штук\n' + res[res.find("!")+2:]
+                                    await msg.edit(content = m)
                             else:
                                 pass
                     else:
