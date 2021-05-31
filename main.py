@@ -124,58 +124,103 @@ def create_shop(name, owners_id):
     connection = getConnection()
     try:
         with connection.cursor() as cursor:
-                cursor.execute('INSERT INTO Shops VALUES(%s,%s,%s,%s)',(0, name, str(owners_id), 0))
+                cursor.execute('INSERT INTO Shops VALUES(%s,%s,%s)',(0, name, str(owners_id)))
                 connection.commit()
         return 1
     except Exception:
         return 0
 
-def add_goods(name, price, id):
-    connection = getConnection()
-    try:
-        with connection.cursor() as cursor:
-                sql = "SELECT id_shop FROM Shops WHERE owner_id_ds = %s"
-                cursor.execute(sql, id)
-                rows = cursor.fetchall()
-                for row in rows:
-                    id_shop = row['id_shop']
-        with connection.cursor() as cursor:
-                cursor.execute('INSERT INTO Products VALUES(%s,%s,%s,%s)',(0, name, price, id_shop))
-                connection.commit()
-        return 1
-    except Exception:
-        return 0
+def add_goods(name, price, id, amount):
+        id_shop = 0
+        nam = ''
+        connection = getConnection()
+        try:
+            with connection.cursor() as cursor:
+                    sql = "SELECT id FROM Shops WHERE owner_id = %s"
+                    cursor.execute(sql, id)
+                    rows = cursor.fetchall()
+                    for row in rows:
+                        id_shop = int(row['id'])
+            if id_shop == 0:
+                return 0
+        except:
+            return 0
+        try:
+            with connection.cursor() as cursor: 
+                    sql = "SELECT amount FROM Products WHERE name = %s"
+                    cursor.execute(sql, name)
+                    rows = cursor.fetchall()
+                    for row in rows:
+                        amount += row['name']
+        except Exception:
+            amount = amount
 
-def remove_good(name, id):
+        try:
+            with connection.cursor() as cursor:
+                    cursor.execute('INSERT INTO Products VALUES(%s,%s,%s,%s,%s)',(0, name, price, id_shop, amount))
+                    connection.commit()
+            with connection.cursor() as cursor: 
+                    sql = "SELECT name FROM Shops WHERE owner_id = %s"
+                    cursor.execute(sql, id)
+                    rows = cursor.fetchall()
+                    for row in rows:
+                        nam = row['name']
+            return nam
+        except Exception:
+            return 0
+
+def remove_good(name, id, amount):
     connection = getConnection()
-    try:
-        with connection.cursor() as cursor:
-                sql = "SELECT id_shop From Shops WHERE owner_id_ds = %s"
+    if amount == 0:
+        #try:
+            with connection.cursor() as cursor:
+                sql = "SELECT id From Shops WHERE owner_id = %s"
                 cursor.execute(sql, id)
                 rows = cursor.fetchall()
                 for row in rows:
-                            id_shop = row['id_shop']
-        with connection.cursor() as cursor:    
-                sql = "DELETE From Products WHERE name_product = %s AND id_shop = %s"
+                            id_shop = row['id']
+            with connection.cursor() as cursor:    
+                sql = "DELETE From Products WHERE name = %s AND id_shop = %s"
                 cursor.execute(sql, (str(name), int(id_shop)))
                 connection.commit()
-        return 1
-    except Exception:
-        return 0
-
-def insert_id(id, owner_id):
-    connection = getConnection()
-    with connection.cursor() as cursor:
-                sql = "UPDATE Shops SET message = %s WHERE owner_id = %s;"
-                cursor.execute(sql, (id, owner_id))
-                connection.commit()
-
-'''def change_price(id, name, new_price):
-    connection = getConnection()
-    with connection.cursor() as cursor:
-                    sql = "SELECT name From Shops WHERE id_shop = %s"
-                    cursor.execute(sql, i)
-                    rows = cursor.fetchall()'''
+            with connection.cursor() as cursor:
+                sql = "SELECT name From Shops WHERE owner_id = %s"
+                cursor.execute(sql, id)
+                rows = cursor.fetchall()
+                for row in rows:
+                            name_shop = row['name']
+            return name_shop
+        #except Exception:
+            #return 0
+    else:
+        try:
+            amount = -amount
+            with connection.cursor() as cursor:
+                    sql = "SELECT id_shop From Shops WHERE owner_id = %s"
+                    cursor.execute(sql, id)
+                    rows = cursor.fetchall()
+                    for row in rows:
+                                id_shop = row['id_shop']
+            with connection.cursor() as cursor:
+                    sql = "SELECT amount From Products WHERE name = %s"
+                    cursor.execute(sql, name)
+                    rows = cursor.fetchall()
+                    for row in rows:
+                                amoun = row['amount']
+            amount = amoun + amount
+            with connection.cursor() as cursor:    
+                    sql = "UPDATE Products SET amount = %s WHERE id_shop = %s"
+                    cursor.execute(sql, (amount, id_shop))
+                    connection.commit()
+            with connection.cursor() as cursor:
+                sql = "SELECT name From Shops WHERE owner_id = %s"
+                cursor.execute(sql, id)
+                rows = cursor.fetchall()
+                for row in rows:
+                            name_shop = row['name']
+            return name_shop
+        except:
+            return 0    
 
 class MyClient(discord.Client):
     
@@ -187,9 +232,9 @@ class MyClient(discord.Client):
                 text = str(message.content)
                 if text == "!help":
                     await message.author.send(
-                        ">>> *Список доступных команд:*\n**!make_order:** - заказать товар\n**!find_goods:** - посмотреть наличие товара в магазинах\n**!create_shop:** - создать магазин\n**!add_goods:** - добавить товар и его цену\n**!my_shop** - посмотреть товары, продающиеся в вашем магазине\n**!show_all** - посмотреть все продающиеся товары\n**!remove_good:** - удалить товар из своего магазина"
+                        ">>> *Список доступных команд:*\n**!make_order:** - заказать товар\n**!create_shop:** - создать магазин\n**!add_goods:** - добавить товар и его цену\n**!remove_good:** - удалить товар из своего магазина"
                     )
-                    await message.author.send(">>> *Примеры:*\n**!make_order:** Элитры, Timmy's World, 100\n**!find_goods:** Элитры\n**!create_shop:** Timmy's World\n**!add_goods:** Тотем, 5\n**!remove_good:** Тотем")
+                    await message.author.send(">>> *Примеры:*\n**!make_order:** Элитры, Timmy's World, 100\n**!create_shop:** Timmy's World\n**!add_goods:** Тотем, 5, 5\n**!remove_good:** Тотем")
                 
                 elif text.find("!make_order") != -1:
                         total_information = make_order(text)
@@ -219,43 +264,52 @@ class MyClient(discord.Client):
                         await message.author.send('>>> Ваш магазин «' + name + '» успешно зарегистрирован. Теперь вы можете добавить товары.')
                         my_channel = await client.fetch_channel(845345224461123619)
                         msg = await my_channel.send(">>> **----{" + str(name) + "}----**\nПока товаров нет!\nВладелец: <@"+ str(owner_id) +">")
-                        id = msg.id
-                        insert_id(id, owner_id)
                     else:
                         await message.author.send('**Ошибка. Попробуйте еще раз или проверьте наличие магазина.**')
 
-                elif text.find('!add_goods') != -1:
+                elif text.find('!add_goods:') != -1:
                     name = text[text.find(':')+2:text.find(',')]
-                    price = text[text.find(',')+1:]
-                    
-                    if add_goods(name, price, message.author.id) == 1:
+                    price = text[text.find(',')+2:text.rfind(',')]
+                    amount = text[text.rfind(',')+2:]
+                    id = message.author.id
+                    result = add_goods(name, price, id, amount)
+                    if result != 0:
                         await message.author.send('>>> Успешно. Товар добавлен в список продаваемых товаров.')
-                        my_channel = await client.fetch_channel(845345224461123619)
-                        message = await my_channel.fetchMessage(return_id())
-                        await message.edit('text')
+                        channel = client.get_channel(845345224461123619)
+                        messages = await channel.history(limit=200).flatten()
+                        for msg in messages:
+                            res = msg.content.find(str(result))
+                            if res != -1:
+                                text = text[:text.find("Владелец")] + '\n' + name + ': ' + price + 'АР -' + amount + 'штук' + text[text.find("Владелец"):]
+                                await msg.edit(content = text)
+                            else:
+                                pass
+                    else:
+                        await message.author.send('**Ошибка. Попробуйте еще раз.**')
 
                                 
                 elif text.find("!remove_good:") != -1:
-                    name = text[text.find(":")+2:]
+                    m = ''
                     id = int(message.author.id)
-                    result = remove_good(name, id) 
+                    info = text.find(',')
+                    if text.find(',') != -1:
+                        name = text[text.find(":")+2:text.find(',')]
+                        amount = text[text.rfind(','):]
+                        result = remove_good(name, id, amount) 
+                    else:
+                        name = text[text.find(":"):]
+                        result = remove_good(name, id, 0) 
                     if result != 0:
                         await message.author.send(">>> Успешно. Товар удален из списка продаваемых.")
+                        channel = client.get_channel(845345224461123619)
+                        messages = await channel.history(limit=200).flatten()
+                        for msg in messages:
+                            res = msg.content.find(str(result))
+                            print(res)
+                            await msg.edit(content=m)
                     else:
                         await message.author.send('**Ошибка. Попробуйте еще раз.**')
 
-                elif text.find("!change_price:") != -1:
-                    item = text[text.find(":")+2:text.rfind(",")]
-                    price = text[text.rfind(","):]
-                    id = int(message.author.id)
-                    '''result = change_price(id, item, price)
-                    if result == 0:
-                        await message.author.send('**Ошибка. Попробуйте еще раз.**')
-                    else:
-                        await message.author.send(">>> Успешно. Цена товара изменена.")
-                else:
-                    await message.author.send('**Ошибка. Попробуйте еще раз.**')
-                    raise Exception'''
-
+                
 client = MyClient()
 client.run(settings['token'])
