@@ -171,8 +171,9 @@ def add_goods(name, price, id, amount):
 
 def remove_good(name, id, amount):
     connection = getConnection()
+    result = []
     if amount == 0:
-        #try:
+        try:
             with connection.cursor() as cursor:
                 sql = "SELECT id From Shops WHERE owner_id = %s"
                 cursor.execute(sql, id)
@@ -189,18 +190,19 @@ def remove_good(name, id, amount):
                 rows = cursor.fetchall()
                 for row in rows:
                             name_shop = row['name']
-            return name_shop
-        #except Exception:
-            #return 0
+            result.append(name_shop)
+            return result
+        except:
+            return 0
     else:
         try:
-            amount = -amount
+            amount = -int(amount)
             with connection.cursor() as cursor:
-                    sql = "SELECT id_shop From Shops WHERE owner_id = %s"
+                    sql = "SELECT id From Shops WHERE owner_id = %s"
                     cursor.execute(sql, id)
                     rows = cursor.fetchall()
                     for row in rows:
-                                id_shop = row['id_shop']
+                                id_shop = row['id']
             with connection.cursor() as cursor:
                     sql = "SELECT amount From Products WHERE name = %s"
                     cursor.execute(sql, name)
@@ -218,7 +220,9 @@ def remove_good(name, id, amount):
                 rows = cursor.fetchall()
                 for row in rows:
                             name_shop = row['name']
-            return name_shop
+            result.append(amount)
+            result.append(name_shop)
+            return result
         except:
             return 0    
 
@@ -257,6 +261,7 @@ class MyClient(discord.Client):
                     else:
                         await message.author.send('**Ошибка заказа. Попробуйте еще раз.**')
 
+
                 elif text.find('!create_shop') != -1:
                     owner_id = int(message.author.id)
                     name = str(text[text.find(':')+2:])
@@ -266,6 +271,7 @@ class MyClient(discord.Client):
                         msg = await my_channel.send(">>> **----{" + str(name) + "}----**\nПока товаров нет!\nВладелец: <@"+ str(owner_id) +">")
                     else:
                         await message.author.send('**Ошибка. Попробуйте еще раз или проверьте наличие магазина.**')
+
 
                 elif text.find('!add_goods:') != -1:
                     name = text[text.find(':')+2:text.find(',')]
@@ -299,19 +305,34 @@ class MyClient(discord.Client):
                     info = text.find(',')
                     if text.find(',') != -1:
                         name = text[text.find(":")+2:text.find(',')]
-                        amount = text[text.rfind(','):]
+                        amount = text[text.rfind(',')+2:]
                         result = remove_good(name, id, amount) 
                     else:
-                        name = text[text.find(":"):]
+                        name = text[text.find(":")+2:]
                         result = remove_good(name, id, 0) 
                     if result != 0:
-                        await message.author.send(">>> Успешно. Товар удален из списка продаваемых.")
-                        channel = client.get_channel(845345224461123619)
-                        messages = await channel.history(limit=200).flatten()
-                        for msg in messages:
-                            res = msg.content.find(str(result))
-                            print(res)
-                            await msg.edit(content=m)
+                        if type(result[0]) != int:
+                            await message.author.send(">>> Успешно. Товар удален из списка продаваемых.")
+                            channel = client.get_channel(845345224461123619)
+                            messages = await channel.history(limit=200).flatten()
+                            for msg in messages:
+                                res = msg.content
+                                if res.find(result[0]) != -1:
+                                    delete_to = res[res.find(name):]
+                                    text = res[:res.find(name)] + delete_to[delete_to.find('\n')+2:]
+                                    await msg.edit(content = text)
+                        else:
+                            await message.author.send(">>> Успешно. Несколько товаров удалено из списка продаваемых.")
+                            channel = client.get_channel(845345224461123619)
+                            messages = await channel.history(limit=200).flatten()
+                            for msg in messages:
+                                res = msg.content
+                                if res.find(result[1]) != -1:
+                                    delete_to = res[res.find(name):]
+                                    delete_to = delete_to[delete_to.find('-'):]
+                                    res2 = res[:res.find(delete_to)]
+                                    text = res2 + ' - ' + str(result[0]) + ' штук' + delete_to[delete_to.find('\n'):]
+                                    await msg.edit(content = text)
                     else:
                         await message.author.send('**Ошибка. Попробуйте еще раз.**')
 
