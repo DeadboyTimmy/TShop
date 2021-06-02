@@ -21,67 +21,42 @@ def getConnection():
                 cursorclass=pymysql.cursors.DictCursor)
             return connection
         except:
-            print("ERROR during connecting to MySQL...reconnecting, tries = " +
-                  tries)
+            print("ERROR during connecting to MySQL...reconnecting, tries = ", tries)
     return None
 
-def check_shop(id):
-    connection = getConnection()
-    try:
-        with connection.cursor() as cursor:
-            sql = "SELECT id_shop From Shops WHERE owner_id_ds = %s"
-            cursor.execute(sql, id)
-            rows = cursor.fetchall()
-            for row in rows:
-                id_shop = row['id_shop']
-        return id_shop
-    except Exception:
-        return 0
-        
-def choose_order(text):
-    shops, shops_names, prices = [], [], []
-    to_return = dict({'example': 0})
-    product = text[text.find(" ") + 1:]
-    connection = getConnection()
-    with connection.cursor() as cursor:
-        sql = "SELECT id_shop From Products WHERE name_product = %s"
-        cursor.execute(sql, product)
-        rows = cursor.fetchall()
-        for row in rows:
-            shops.append(row['id_shop'])
-    for i in shops:
-        with connection.cursor() as cursor:
-            sql = "SELECT name From Shops WHERE id_shop = %s"
-            cursor.execute(sql, i)
-            rows = cursor.fetchall()
-            for row in rows:
-                shops_names.append(row['name'])
-    if len(shops_names) == 0:
-        return (0)
-    for i in shops:
-        with connection.cursor() as cursor:
-            sql = "SELECT price From Products WHERE id_shop = %s"
-            cursor.execute(sql, i)
-            rows = cursor.fetchall()
-            for row in rows:
-                prices.append(row['price'])
-    to_return = dict(zip(shops_names, prices))
-    return to_return
+def getConnection2():
+    tries = 0
+    while tries < 2:
+        tries += 1
+        try:
+            connection = pymysql.connect(
+                host=os.getenv("HOST2"),
+                user=os.getenv("USER2"),
+                password=os.getenv("PASSWORD2"),
+                db=os.getenv("DB2"),
+                charset='utf8mb4',
+                cursorclass=pymysql.cursors.DictCursor)
+            return connection
+        except Exception as e:
+            print("ERROR2 during connecting to MySQL...reconnecting, tries = ", tries)
+            print(e)
+    return None
 
-def make_order(text):
+def make_order(text, id):
     text = text[text.find(':') + 2:]
     text = text.split(', ')
     product = text[0]
     shop_name = text[1]
     amount = text[2]
-    city = text[3]
+    balance = 0
+    connection2 = getConnection2()
     connection = getConnection()
     with connection.cursor() as cursor:
-            sql = "SELECT id_shop FROM Shops WHERE name = %s"
+            sql = "SELECT id FROM Shops WHERE name = %s"
             cursor.execute(sql, shop_name)
             rows = cursor.fetchall()
             for row in rows:
-                shop_id = row['id_shop']
+                shop_id = row['id']
     with connection.cursor() as cursor:
             sql = "SELECT price FROM Products WHERE id_shop = %s"
             cursor.execute(sql, shop_id)
@@ -89,32 +64,43 @@ def make_order(text):
             for row in rows:
                 price = row['price']
     total_price = int(price) * int(amount)
-    return_to = []
-    return_to.append(amount)
-    return_to.append(product)
-    return_to.append(total_price)
-    return_to.append(city)
-    return_to.append(shop_id)
-    return return_to
+    try:
+        with connection2.cursor() as cursor:
+                sql = "SELECT balance FROM kbank_accounts WHERE discord = %s"
+                cursor.execute(sql, id)
+                rows = cursor.fetchall()
+                for row in rows:
+                    balance = row['balance']
+    except:
+        return 0
+    if balance < total_price:
+        return 0
+    else:
+        return_to = []
+        return_to.append(amount)
+        return_to.append(product)
+        return_to.append(total_price)
+        return_to.append(shop_id)
+        return return_to
 
 def confirm_order(array):
+    print(array)
     amount = int(array[0])
     product = str(array[1])
     total_price = int(array[2])
-    city = str(array[3])
-    user_id = int(array[5])
-    shop_id = int(array[4])
+    user_id = int(array[4])
+    shop_id = int(array[3])
     connection = getConnection()
     try:
         with connection.cursor() as cursor:
-                cursor.execute('INSERT INTO Orders VALUES(%s,%s,%s,%s,%s,%s,%s)',(0, user_id, product, amount, total_price, shop_id, city))
+                cursor.execute('INSERT INTO Orders VALUES(%s,%s,%s,%s,%s,%s)',(0, user_id, product, amount, total_price, shop_id))
                 connection.commit()
         with connection.cursor() as cursor:
-            sql = "SELECT owner_id_ds FROM Shops WHERE id_shop = %s"
+            sql = "SELECT owner_id FROM Shops WHERE id = %s"
             cursor.execute(sql, shop_id)
             rows = cursor.fetchall()
             for row in rows:
-                id = row['owner_id_ds']
+                id = row['owner_id']
             array.append(int(id))
         return array
     except Exception:
@@ -122,6 +108,17 @@ def confirm_order(array):
 
 def create_shop(name, owners_id):
     connection = getConnection()
+    balance = 0
+    connection2 = getConnection2()
+    try:
+        with connection2.cursor() as cursor:
+                sql = "SELECT balance FROM kbank_accounts WHERE discord = %s"
+                cursor.execute(sql, id)
+                rows = cursor.fetchall()
+                for row in rows:
+                    balance = int(row['id'])
+    except:
+        return 0
     try:
         with connection.cursor() as cursor:
                 cursor.execute('INSERT INTO Shops VALUES(%s,%s,%s)',(0, name, str(owners_id)))
@@ -211,8 +208,8 @@ def remove_good(name, id, amount):
                                 amoun = row['amount']
             amount = amoun + amount
             with connection.cursor() as cursor:    
-                    sql = "UPDATE Products SET amount = %s WHERE id_shop = %s"
-                    cursor.execute(sql, (amount, id_shop))
+                    sql = "UPDATE Products SET amount = %s WHERE name = %s AND id_shop = %s"
+                    cursor.execute(sql, (int(amount), str(name), int(id_shop)))
                     connection.commit()
             with connection.cursor() as cursor:
                 sql = "SELECT name From Shops WHERE owner_id = %s"
@@ -279,12 +276,18 @@ class MyClient(discord.Client):
                     await message.author.send(">>> *Примеры:*\n**!make_order:** Элитры, Timmy's World, 100\n**!create_shop:** Timmy's World\n**!add_goods:** Тотем, 5, 5\n**!remove_good:** Тотем\n**!add_ex_goods:** Незерит, 8")
 
                 elif text.find("!make_order") != -1:
-                        total_information = make_order(text)
+                    id = message.author.id
+                    total_information = make_order(text, id)
+                    print(total_information)
+                    if total_information != 0:
                         text_last.append(text)
-                        await message.author.send('>>> Вы собираетесь купить '+ str(total_information[0])+' единиц товара «' + total_information[1] + '».\nИтоговая сумма заказа составляет '+ str(total_information[2])+' АР\nНапишите !confirm для подтверждения действия')
+                        await message.author.send('>>> Вы собираетесь купить '+ str(total_information[0])+' единиц товара «' + str(total_information[1]) + '».\nИтоговая сумма заказа составляет '+ str(total_information[2])+' АР\nНапишите !confirm для подтверждения действия')
+                    else:
+                        await message.author.send('**Ошибка. Попробуйте еще раз.**')
                 
                 elif text.find('!confirm') != -1:
-                    total_information = make_order(text_last[-1])
+                    id = message.author.id
+                    total_information = make_order(text_last[-1], id)
                     total_information.append(message.author.id)
                     info =confirm_order(total_information)
                     if info != 0:
@@ -312,7 +315,7 @@ class MyClient(discord.Client):
 
 
                 elif text.find('!add_goods:') != -1:
-                    if text.find(',') != text.rfind:
+                    if text.find(',') != text.rfind(','):
                         name = text[text.find(':')+2:text.find(',')]
                         price = text[text.find(',')+2:text.rfind(',')]
                         amount = text[text.rfind(',')+2:]
@@ -327,6 +330,7 @@ class MyClient(discord.Client):
                                 res = msg.content
                                 if res1 != -1:
                                     if res.find('Пока') == -1:
+
                                         m = res[:res.find("Владелец")] + name + ': ' + price + 'АР -' + amount + 'штук\n' + res[res.find("Владелец"):]
                                         await msg.edit(content = m)
                                     else:
@@ -387,9 +391,12 @@ class MyClient(discord.Client):
                             for msg in messages:
                                 res = msg.content
                                 if res.find(result[0]) != -1:
-                                    delete_to = res[res.find(name):]
-                                    text = res[:res.find(name)] + delete_to[delete_to.find('\n')+2:]
-                                    await msg.edit(content = text)
+                                    if res.find(name) != -1:
+                                        delete_to = res[res.find(name):]
+                                        text = res[:res.find(name)] + delete_to[delete_to.find('\n')+1:]
+                                        await msg.edit(content = text)
+                                    else:
+                                        await message.author.send('**Ошибка. Попробуйте еще раз.**')
                         else:
                             await message.author.send(">>> Успешно. Несколько товаров удалено из списка продаваемых.")
                             channel = client.get_channel(845345224461123619)
