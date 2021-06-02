@@ -51,20 +51,20 @@ def make_order(text, id):
     balance = 0
     connection2 = getConnection2()
     connection = getConnection()
-    with connection.cursor() as cursor:
-            sql = "SELECT id FROM Shops WHERE name = %s"
-            cursor.execute(sql, shop_name)
-            rows = cursor.fetchall()
-            for row in rows:
-                shop_id = row['id']
-    with connection.cursor() as cursor:
-            sql = "SELECT price FROM Products WHERE id_shop = %s"
-            cursor.execute(sql, shop_id)
-            rows = cursor.fetchall()
-            for row in rows:
-                price = row['price']
-    total_price = int(price) * int(amount)
     try:
+        with connection.cursor() as cursor:
+                sql = "SELECT id FROM Shops WHERE name = %s"
+                cursor.execute(sql, shop_name)
+                rows = cursor.fetchall()
+                for row in rows:
+                    shop_id = row['id']
+        with connection.cursor() as cursor:
+                sql = "SELECT price FROM Products WHERE id_shop = %s"
+                cursor.execute(sql, shop_id)
+                rows = cursor.fetchall()
+                for row in rows:
+                    price = row['price']
+        total_price = int(price) * int(amount)
         with connection2.cursor() as cursor:
                 sql = "SELECT balance FROM kbank_accounts WHERE discord = %s"
                 cursor.execute(sql, id)
@@ -84,6 +84,7 @@ def make_order(text, id):
         return return_to
 
 def confirm_order(array):
+    array2 = [array]
     print(array)
     amount = int(array[0])
     product = str(array[1])
@@ -91,33 +92,25 @@ def confirm_order(array):
     user_id = int(array[4])
     shop_id = int(array[3])
     tozon_id = "657571691005870081"
-    balance = 0
+    owner_id = ''
     connection = getConnection()
     connection2 = getConnection2()
     try:
         with connection2.cursor() as cursor:
-            sql = "SELECT balance FROM kbank_accounts WHERE discord = %s"
-            cursor.execute(sql, user_id)
+            sql = "UPDATE kbank_accounts SET balance = balance - %s WHERE discord = %s"
+            cursor.execute(sql, (total_price, user_id))
+            connection2.commit()
+        with connection2.cursor() as cursor:
+            sql = "UPDATE kbank_accounts SET balance = balance + %s WHERE discord = %s"
+            cursor.execute(sql, (total_price, tozon_id))
+            connection2.commit()
+        with connection.cursor() as cursor:
+            sql = "SELECT owner_id FROM Shops WHERE id = %s"
+            cursor.execute(sql, shop_id)
             rows = cursor.fetchall()
             for row in rows:
-                balance = row['balance']
-            balance = balance - total_price
-        with connection2.cursor() as cursor:
-            sql = "UPDATE kbank_accounts SET balance = %s WHERE discord = %s"
-            cursor.execute(sql, (balance, user_id))
-            connection.commit()
-        with connection2.cursor() as cursor:
-            sql = "SELECT balance FROM kbank_accounts WHERE discord = %s"
-            cursor.execute(sql, tozon_id)
-            rows = cursor.fetchall()
-            for row in rows:
-                tozon_balance = row['balance']
-            tozon_balance = tozon_balance + total_price
-        with connection2.cursor() as cursor:
-            sql = "UPDATE kbank_accounts SET balance = %s WHERE discord = %s"
-            cursor.execute(sql, (balance, tozon_id))
-            connection.commit()
-        remove_good(product,user_id, amount)
+                owner_id = row['owner_id']
+        array2.append(remove_good(product, owner_id, amount))
         with connection.cursor() as cursor:
                 cursor.execute('INSERT INTO Orders VALUES(%s,%s,%s,%s,%s,%s)',(0, user_id, product, amount, total_price, shop_id))
                 connection.commit()
@@ -128,7 +121,8 @@ def confirm_order(array):
             for row in rows:
                 id = row['owner_id']
             array.append(int(id))
-        return array
+        print(array2)
+        return array2
     except Exception:
         return 0
 
@@ -315,19 +309,29 @@ class MyClient(discord.Client):
                     id = message.author.id
                     total_information = make_order(text_last[-1], id)
                     total_information.append(message.author.id)
-                    info =confirm_order(total_information)
+                    info = confirm_order(total_information)
                     if info != 0:
                         await message.author.send('>>> Ваш заказ принят, ждите доставки.')
-                        amount = int(info[0])
-                        product = str(info[1])
-                        total_price = int(info[2])
-                        id = int(info[-1])
+                        amount = int(info[0][0])
+                        product = str(info[0][1])
+                        total_price = int(info[0][2])
+                        id = int(info[0][-1])
                         user = await client.fetch_user(int(id))
                         msg = 'Вам пришел заказ на ' + str(amount) + ' товара «' + str(product) + '» на сумму ' + str(total_price)+ ' АР'
                         await user.send(msg)
+                        result = info[1]
+                        channel = client.get_channel(845345224461123619)
+                        messages = await channel.history(limit=200).flatten()
+                        for msg in messages:
+                            res = msg.content
+                            if res.find(result[1]) != -1:
+                                delete_to = res[res.find(product):]
+                                delete_to = delete_to[delete_to.find('-'):]
+                                res2 = res[:res.find(delete_to)]
+                                text = res2 + ' - ' + str(result[0]) + ' штук' + delete_to[delete_to.find('\n'):]
+                                await msg.edit(content = text)
                     else:
                         await message.author.send('**Ошибка заказа. Попробуйте еще раз.**')
-
 
                 elif text.find('!create_shop') != -1:
                     owner_id = int(message.author.id)
