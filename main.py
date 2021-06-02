@@ -117,6 +117,7 @@ def confirm_order(array):
             sql = "UPDATE kbank_accounts SET balance = %s WHERE discord = %s"
             cursor.execute(sql, (balance, tozon_id))
             connection.commit()
+        remove_good(product,user_id, amount)
         with connection.cursor() as cursor:
                 cursor.execute('INSERT INTO Orders VALUES(%s,%s,%s,%s,%s,%s)',(0, user_id, product, amount, total_price, shop_id))
                 connection.commit()
