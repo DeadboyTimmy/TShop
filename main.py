@@ -90,8 +90,33 @@ def confirm_order(array):
     total_price = int(array[2])
     user_id = int(array[4])
     shop_id = int(array[3])
+    tozon_id = "657571691005870081"
+    balance = 0
     connection = getConnection()
+    connection2 = getConnection2()
     try:
+        with connection2.cursor() as cursor:
+            sql = "SELECT balance FROM kbank_accounts WHERE discord = %s"
+            cursor.execute(sql, user_id)
+            rows = cursor.fetchall()
+            for row in rows:
+                balance = row['balance']
+            balance = balance - total_price
+        with connection2.cursor() as cursor:
+            sql = "UPDATE kbank_accounts SET balance = %s WHERE discord = %s"
+            cursor.execute(sql, (balance, user_id))
+            connection.commit()
+        with connection2.cursor() as cursor:
+            sql = "SELECT balance FROM kbank_accounts WHERE discord = %s"
+            cursor.execute(sql, tozon_id)
+            rows = cursor.fetchall()
+            for row in rows:
+                tozon_balance = row['balance']
+            tozon_balance = tozon_balance + total_price
+        with connection2.cursor() as cursor:
+            sql = "UPDATE kbank_accounts SET balance = %s WHERE discord = %s"
+            cursor.execute(sql, (balance, tozon_id))
+            connection.commit()
         with connection.cursor() as cursor:
                 cursor.execute('INSERT INTO Orders VALUES(%s,%s,%s,%s,%s,%s)',(0, user_id, product, amount, total_price, shop_id))
                 connection.commit()
