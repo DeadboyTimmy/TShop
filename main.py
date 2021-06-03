@@ -91,7 +91,7 @@ def confirm_order(array):
     total_price = int(array[2])
     user_id = int(array[4])
     shop_id = int(array[3])
-    tozon_id = "657571691005870081"
+    tozon_id = "830123622143230004"
     owner_id = ''
     connection = getConnection()
     connection2 = getConnection2()
@@ -125,6 +125,50 @@ def confirm_order(array):
         return array2
     except Exception:
         return 0
+    
+def get_order(id, product):
+    connection = getConnection()
+    connection2 = getConnection2()
+    tozon_id = "830123622143230004"
+    id_shop = 0
+    summ = 0 
+    owner_id = 0
+    try:
+        with connection.cursor() as cursor:
+            sql = "SELECT shop_id FROM Orders WHERE customer_id = %s"
+            cursor.execute(sql, id)
+            rows = cursor.fetchall()
+            for row in rows:
+                id_shop = int(row['shop_id'])
+        with connection.cursor() as cursor:
+            sql = "SELECT owner_id FROM Shops WHERE id = %s"
+            cursor.execute(sql, id_shop)
+            rows = cursor.fetchall()
+            for row in rows:
+                owner_id = int(row['owner_id'])
+        with connection.cursor() as cursor:
+            sql = "SELECT total_price FROM Orders WHERE customer_id = %s"
+            cursor.execute(sql, id)
+            rows = cursor.fetchall()
+            for row in rows:
+                summ = int(row['total_price'])
+        with connection.cursor() as cursor:
+            sql = "DELETE FROM Orders WHERE customer_id = %s AND product = %s"
+            cursor.execute(sql, (str(id), str(product)))
+            connection.commit()
+        with connection2.cursor() as cursor:
+            sql = "UPDATE kbank_accounts SET balance = balance - %s WHERE discord = %s"
+            cursor.execute(sql, (int(summ), str(tozon_id)))
+            connection2.commit()
+
+        with connection2.cursor() as cursor:
+            sql = "UPDATE kbank_accounts SET balance = balance + %s WHERE discord = %s"
+            cursor.execute(sql, (int(summ), str(owner_id)))
+            connection2.commit()  
+        return owner_id
+    except:
+        return 0
+    
 
 def create_shop(name, owners_id):
     connection = getConnection()
@@ -251,18 +295,21 @@ def add_old_goods(name, id, amount):
     connection = getConnection()
     try:
         with connection.cursor() as cursor: 
-                        sql = "SELECT id FROM Shops WHERE owner_id = %s"
-                        cursor.execute(sql, str(id))
-                        rows = cursor.fetchall()
-                        for row in rows:
-                            id_shop = row['id']
-        with connection.cursor() as cursor: 
                         sql = "SELECT name FROM Shops WHERE owner_id = %s"
                         cursor.execute(sql, str(id))
                         rows = cursor.fetchall()
                         for row in rows:
                             shop_name = row['name']
                         result.append(shop_name)
+    except:
+        return 0
+    try:
+        with connection.cursor() as cursor: 
+                        sql = "SELECT id FROM Shops WHERE owner_id = %s"
+                        cursor.execute(sql, str(id))
+                        rows = cursor.fetchall()
+                        for row in rows:
+                            id_shop = row['id']
         with connection.cursor() as cursor: 
                     sql = "SELECT amount FROM Products WHERE name = %s AND id_shop = %s"
                     cursor.execute(sql, (name, id_shop))
@@ -301,7 +348,7 @@ class MyClient(discord.Client):
                     print(total_information)
                     if total_information != 0:
                         text_last.append(text)
-                        await message.author.send('>>> Вы собираетесь купить '+ str(total_information[0])+' единиц товара «' + str(total_information[1]) + '».\nИтоговая сумма заказа составляет '+ str(total_information[2])+' АР\nНапишите !confirm для подтверждения действия')
+                        await message.author.send('>>> Вы собираетесь купить '+ str(total_information[0])+' единиц товара «' + str(total_information[1]) + '».\nИтоговая сумма заказа составляет '+ str(total_information[2])+' АР\nНапишите **!confirm** для подтверждения действия')
                     else:
                         await message.author.send('**Ошибка. Попробуйте еще раз.**')
                 
@@ -311,7 +358,7 @@ class MyClient(discord.Client):
                     total_information.append(message.author.id)
                     info = confirm_order(total_information)
                     if info != 0:
-                        await message.author.send('>>> Ваш заказ принят, ждите доставки.')
+                        await message.author.send('>>> Спасибо за покупку! Ваш заказ принят, ждите доставки.\nПри получении заказа напишите: **!get_order: <товар>**.')
                         amount = int(info[0][0])
                         product = str(info[0][1])
                         total_price = int(info[0][2])
@@ -328,10 +375,22 @@ class MyClient(discord.Client):
                                 delete_to = res[res.find(product):]
                                 delete_to = delete_to[delete_to.find('-'):]
                                 res2 = res[:res.find(delete_to)]
-                                text = res2 + ' - ' + str(result[0]) + ' штук' + delete_to[delete_to.find('\n'):]
+                                text = res2 + '- ' + str(result[0]) + ' штук' + delete_to[delete_to.find('\n'):]
                                 await msg.edit(content = text)
                     else:
                         await message.author.send('**Ошибка заказа. Попробуйте еще раз.**')
+
+                elif text.find('!get_order:') != -1:
+                    id = message.author.id
+                    product = text[text.find(':')+2:]
+                    res = get_order(id, product)
+                    if res != 0:
+                        await message.author.send('>>> **Успешно! Спасибо, что вы с нами!**')
+                        user = await client.fetch_user(int(res))
+                        msg = '>>> Проверьте баланс в банке. Вам начислены АРы за товар.'
+                        await user.send(msg)
+                    else:
+                        await message.author.send('**Ошибка.**')
 
                 elif text.find('!create_shop') != -1:
                     owner_id = int(message.author.id)
@@ -361,10 +420,10 @@ class MyClient(discord.Client):
                                 if res1 != -1:
                                     if res.find('Пока') == -1:
 
-                                        m = res[:res.find("Владелец")] + name + ': ' + price + 'АР -' + amount + 'штук\n' + res[res.find("Владелец"):]
+                                        m = res[:res.find("Владелец")] + name + ': ' + price + 'АР - ' + amount + 'штук\n' + res[res.find("Владелец"):]
                                         await msg.edit(content = m)
                                     else:
-                                        m = res[:res.find("Пока")] + name + ': ' + price + 'АР -' + amount + 'штук\n' + res[res.find("!")+2:]
+                                        m = res[:res.find("Пока")] + name + ': ' + price + 'АР - ' + amount + 'штук\n' + res[res.find("!")+2:]
                                         await msg.edit(content = m)
                                 else:
                                     pass
