@@ -85,7 +85,6 @@ def make_order(text, id):
 
 def confirm_order(array):
     array2 = [array]
-    print(array)
     amount = int(array[0])
     product = str(array[1])
     total_price = int(array[2])
@@ -121,7 +120,6 @@ def confirm_order(array):
             for row in rows:
                 id = row['owner_id']
             array.append(int(id))
-        print(array2)
         return array2
     except Exception:
         return 0
@@ -317,7 +315,6 @@ def add_old_goods(name, id, amount):
                     for row in rows:
                         am = row['amount']
         amount = am + int(amount)
-        print(amount)
         result.append(amount)
         with connection.cursor() as cursor:
                 sql = "UPDATE Products SET amount = %s WHERE id_shop = %s AND name = %s"
@@ -345,7 +342,6 @@ class MyClient(discord.Client):
                 elif text.find("!make_order") != -1:
                     id = message.author.id
                     total_information = make_order(text, id)
-                    print(total_information)
                     if total_information != 0:
                         text_last.append(text)
                         await message.author.send('>>> Вы собираетесь купить '+ str(total_information[0])+' единиц товара «' + str(total_information[1]) + '».\nИтоговая сумма заказа составляет '+ str(total_information[2])+' АР\nНапишите **!confirm** для подтверждения действия')
@@ -375,7 +371,7 @@ class MyClient(discord.Client):
                                 delete_to = res[res.find(product):]
                                 delete_to = delete_to[delete_to.find('-'):]
                                 res2 = res[:res.find(delete_to)]
-                                text = res2 + '- ' + str(result[0]) + ' штук' + delete_to[delete_to.find('\n'):]
+                                text = res2 + '- ' + str(int(result[0])-int(amount)) + ' штук' + delete_to[delete_to.find('\n'):]
                                 await msg.edit(content = text)
                     else:
                         await message.author.send('**Ошибка заказа. Попробуйте еще раз.**')
