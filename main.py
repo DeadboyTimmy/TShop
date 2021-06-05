@@ -363,182 +363,184 @@ class MyClient(discord.Client):
         if message.author != client.user:
             if str(message.channel).find('Direct Message with') != -1:
                 guild = client.get_guild(810921714418188330)
+                roles = set()
                 for role in guild.roles:
-                    if role.id == 845737501293543444:
-                        text = str(message.content)
-                        if text == "!help":
-                            await message.author.send(
-                                ">>> *Список доступных команд:*\n**!make_order:** - заказать товар\n**!create_shop:** - создать магазин\n**!add_goods:** - добавить товар и его цену\n**!remove_good:** - удалить товар из своего магазина или определенное кол-во товара\n**!add_ex_goods:** - добавить товары, имеющиеся в магазине")
-                            await message.author.send(">>> *Поля, необходимые для заполнения:*\n**!make_order:** <товар>, <название магазина>, <кол-во товара>\n**!create_shop:** <название магазина>\n**!add_goods:** <товар>, <цена за партию>, <кол-во>, <кол-во товаров в 1 партии>\n**!remove_good:** <товар>, <количество> ***обратите внимание, что второе поле не нужно, если вам надо удалить все товары***\n**!add_ex_goods:** <товар>, <кол-во>")
-                            await message.author.send(">>> *Примеры:*\n**!make_order:** Элитры, Timmy's World, 100\n**!create_shop:** Timmy's World\n**!add_goods:** Тотем, 5, 5, 1\n**!remove_good:** Тотем\n**!add_ex_goods:** Незерит, 8")
-                            await message.author.send(">>> *Дополнительные команды:*\n**!confirm** - подтверждение заказа\n**!get_order** - заказ получен")
-                        elif text.find("!make_order") != -1:
+                    roles.add(role.id)
+                if 845737501293543444 in roles:
+                    text = str(message.content)
+                    if text == "!help":
+                        await message.author.send(
+                            ">>> *Список доступных команд:*\n**!make_order:** - заказать товар\n**!create_shop:** - создать магазин\n**!add_goods:** - добавить товар и его цену\n**!remove_good:** - удалить товар из своего магазина или определенное кол-во товара\n**!add_ex_goods:** - добавить товары, имеющиеся в магазине")
+                        await message.author.send(">>> *Поля, необходимые для заполнения:*\n**!make_order:** <товар>, <название магазина>, <кол-во товара>\n**!create_shop:** <название магазина>\n**!add_goods:** <товар>, <цена за партию>, <кол-во>, <кол-во товаров в 1 партии>\n**!remove_good:** <товар>, <количество> ***обратите внимание, что второе поле не нужно, если вам надо удалить все товары***\n**!add_ex_goods:** <товар>, <кол-во>")
+                        await message.author.send(">>> *Примеры:*\n**!make_order:** Элитры, Timmy's World, 100\n**!create_shop:** Timmy's World\n**!add_goods:** Тотем, 5, 5, 1\n**!remove_good:** Тотем\n**!add_ex_goods:** Незерит, 8")
+                        await message.author.send(">>> *Дополнительные команды:*\n**!confirm** - подтверждение заказа\n**!get_order** - заказ получен")
+                    elif text.find("!make_order") != -1:
+                        id = message.author.id
+                        total_information = make_order(text, id)
+                        if total_information != 0:
+                            text_last.append(text)
+                            await message.author.send('>>> Вы собираетесь купить '+ str(total_information[0])+' единиц товара «' + str(total_information[1]) + '».\nИтоговая сумма заказа составляет '+ str(total_information[2])+' АР\nНапишите **!confirm** для подтверждения действия')
+                        else:
+                            await message.author.send('**Ошибка. Попробуйте еще раз.**')
+                    
+                    elif text.find('!confirm') != -1:
+                        id = message.author.id
+                        total_information = make_order(text_last[-1], id)
+                        total_information.append(message.author.id)
+                        info = confirm_order(total_information)
+                        if info != 0:
+                            await message.author.send('>>> Спасибо за покупку! Ваш заказ принят, ждите доставки.\nПри получении заказа напишите: **!get_order: <товар>**.')
+                            amount = int(info[0][0])
+                            product = str(info[0][1])
+                            total_price = int(info[0][2])
+                            id = int(info[0][-1])
+                            user = await client.fetch_user(int(id))
+                            msg = 'Вам пришел заказ на ' + str(amount) + ' товара «' + str(product) + '» на сумму ' + str(total_price)+ ' АР'
+                            await user.send(msg)
+                            result = info[1]
+                            channel = client.get_channel(845345224461123619)
+                            messages = await channel.history(limit=200).flatten()
+                            for msg in messages:
+                                res = msg.content
+                                if res.find(result[1]) != -1:
+                                    delete_to = res[res.find(product):]
+                                    delete_to = delete_to[delete_to.find('-'):]
+                                    res2 = res[:res.find(delete_to)]
+                                    text = res2 + '- ' + str(int(result[0])-int(amount)) + ' штук' + delete_to[delete_to.find('\n'):]
+                                    await msg.edit(content = text)
+                        else:
+                            await message.author.send('**Ошибка заказа. Попробуйте еще раз.**')
+
+                    elif text.find('!get_order:') != -1:
+                        id = message.author.id
+                        product = text[text.find(':')+2:]
+                        res = get_order(id, product)
+                        if res != 0:
+                            await message.author.send('>>> **Успешно! Спасибо, что вы с нами!**')
+                            user = await client.fetch_user(int(res))
+                            msg = '>>> Проверьте баланс в банке. Вам начислены АРы за товар.'
+                            await user.send(msg)
+                        else:
+                            await message.author.send('**Ошибка.**')
+
+                    elif text.find('!create_shop') != -1:
+                        owner_id = int(message.author.id)
+                        name = str(text[text.find(':')+2:])
+                        if create_shop(name, owner_id) == 1:
+                            await message.author.send('>>> Ваш магазин «' + name + '» успешно зарегистрирован. Теперь вы можете добавить товары.')
+                            my_channel = await client.fetch_channel(845345224461123619)
+                            msg = await my_channel.send(">>> **----{" + str(name) + "}----**\nПока товаров нет!\nВладелец: <@"+ str(owner_id) +">")
+                        else:
+                            await message.author.send('**Ошибка. Попробуйте еще раз или проверьте наличие магазина.**')
+
+
+                    elif text.find('!add_goods:') != -1:
+                        if text.find(',') != text.rfind(','):
+                            tex = text[text.find(':')+2:]
+                            parametres = tex.split(',')
+                            print(parametres)
+                            name = parametres[0]
+                            price = parametres[1]
+                            amount = parametres[2]
+                            batch = parametres[3]
                             id = message.author.id
-                            total_information = make_order(text, id)
-                            if total_information != 0:
-                                text_last.append(text)
-                                await message.author.send('>>> Вы собираетесь купить '+ str(total_information[0])+' единиц товара «' + str(total_information[1]) + '».\nИтоговая сумма заказа составляет '+ str(total_information[2])+' АР\nНапишите **!confirm** для подтверждения действия')
+                            r = check_good(name, id)
+                            print(r)
+                            if r == 0:
+                                await message.author.send('**Проверьте наличие товара в магазине.**')
                             else:
-                                await message.author.send('**Ошибка. Попробуйте еще раз.**')
-                        
-                        elif text.find('!confirm') != -1:
-                            id = message.author.id
-                            total_information = make_order(text_last[-1], id)
-                            total_information.append(message.author.id)
-                            info = confirm_order(total_information)
-                            if info != 0:
-                                await message.author.send('>>> Спасибо за покупку! Ваш заказ принят, ждите доставки.\nПри получении заказа напишите: **!get_order: <товар>**.')
-                                amount = int(info[0][0])
-                                product = str(info[0][1])
-                                total_price = int(info[0][2])
-                                id = int(info[0][-1])
-                                user = await client.fetch_user(int(id))
-                                msg = 'Вам пришел заказ на ' + str(amount) + ' товара «' + str(product) + '» на сумму ' + str(total_price)+ ' АР'
-                                await user.send(msg)
-                                result = info[1]
-                                channel = client.get_channel(845345224461123619)
-                                messages = await channel.history(limit=200).flatten()
-                                for msg in messages:
-                                    res = msg.content
-                                    if res.find(result[1]) != -1:
-                                        delete_to = res[res.find(product):]
-                                        delete_to = delete_to[delete_to.find('-'):]
-                                        res2 = res[:res.find(delete_to)]
-                                        text = res2 + '- ' + str(int(result[0])-int(amount)) + ' штук' + delete_to[delete_to.find('\n'):]
-                                        await msg.edit(content = text)
-                            else:
-                                await message.author.send('**Ошибка заказа. Попробуйте еще раз.**')
-
-                        elif text.find('!get_order:') != -1:
-                            id = message.author.id
-                            product = text[text.find(':')+2:]
-                            res = get_order(id, product)
-                            if res != 0:
-                                await message.author.send('>>> **Успешно! Спасибо, что вы с нами!**')
-                                user = await client.fetch_user(int(res))
-                                msg = '>>> Проверьте баланс в банке. Вам начислены АРы за товар.'
-                                await user.send(msg)
-                            else:
-                                await message.author.send('**Ошибка.**')
-
-                        elif text.find('!create_shop') != -1:
-                            owner_id = int(message.author.id)
-                            name = str(text[text.find(':')+2:])
-                            if create_shop(name, owner_id) == 1:
-                                await message.author.send('>>> Ваш магазин «' + name + '» успешно зарегистрирован. Теперь вы можете добавить товары.')
-                                my_channel = await client.fetch_channel(845345224461123619)
-                                msg = await my_channel.send(">>> **----{" + str(name) + "}----**\nПока товаров нет!\nВладелец: <@"+ str(owner_id) +">")
-                            else:
-                                await message.author.send('**Ошибка. Попробуйте еще раз или проверьте наличие магазина.**')
-
-
-                        elif text.find('!add_goods:') != -1:
-                            if text.find(',') != text.rfind(','):
-                                tex = text[text.find(':')+2:]
-                                parametres = tex.split(',')
-                                print(parametres)
-                                name = parametres[0]
-                                price = parametres[1]
-                                amount = parametres[2]
-                                batch = parametres[3]
-                                id = message.author.id
-                                r = check_good(name, id)
-                                print(r)
-                                if r == 0:
-                                    await message.author.send('**Проверьте наличие товара в магазине.**')
-                                else:
-                                    result = add_goods(name, price, id, amount, batch)
-                                    if result != 0:
-                                        await message.author.send('>>> Успешно. Товар добавлен в список продаваемых товаров.')
-                                        channel = client.get_channel(845345224461123619)
-                                        messages = await channel.history(limit=200).flatten()
-                                        for msg in messages:
-                                            res1 = msg.content.find(str(result))
-                                            res = msg.content
-                                            if res1 != -1:
-                                                if res.find('Пока') == -1:
-                                                    m = res[:res.find("Владелец")] + name + ': **' + price + '** АР за **'+ batch +'** шт.; в наличии ' +amount + ' штук\n' + res[res.find("Владелец"):]
-                                                    await msg.edit(content = m)
-                                                else:
-                                                    m = res[:res.find("Пока")] + name + ': **' + price + '** АР за **' + batch + '** шт.; в наличии '+ amount + ' штук\n' + res[res.find("!")+2:]
-                                                    await msg.edit(content = m)
-                                            else:
-                                                pass
-                                    else:
-                                        await message.author.send('**Ошибка. Попробуйте еще раз.**')
-                            else:
-                                await message.author.send('**Ошибка.**')
-
-                        elif text.find('!add_ex_goods:') != -1:
-                            if text.find(',') == text.find(','):
-                                name = text[text.find(':')+2:text.find(',')]
-                                amount = text[text.find(',')+2:]
-                                id = message.author.id
-                                result = add_old_goods(name, id, amount)
+                                result = add_goods(name, price, id, amount, batch)
                                 if result != 0:
                                     await message.author.send('>>> Успешно. Товар добавлен в список продаваемых товаров.')
                                     channel = client.get_channel(845345224461123619)
                                     messages = await channel.history(limit=200).flatten()
                                     for msg in messages:
-                                        res1 = msg.content.find(str(result[0]))
+                                        res1 = msg.content.find(str(result))
                                         res = msg.content
                                         if res1 != -1:
-                                            leave2 = res[res.find(name):]
-                                            leave1 = res[:res.find(name)]
-                                            leave2 = leave2[leave2.find('штук')-1:]
-                                            another_part = res[res.find(name):]
-                                            position = another_part.find('в наличии ')
-                                            another_part = another_part[:position + 10]
-                                            m = leave1 + another_part + str(result[1]) + leave2
-                                            await msg.edit(content = m)
+                                            if res.find('Пока') == -1:
+                                                m = res[:res.find("Владелец")] + name + ': **' + price + '** АР за **'+ batch +'** шт.; в наличии ' +amount + ' штук\n' + res[res.find("Владелец"):]
+                                                await msg.edit(content = m)
+                                            else:
+                                                m = res[:res.find("Пока")] + name + ': **' + price + '** АР за **' + batch + '** шт.; в наличии '+ amount + ' штук\n' + res[res.find("!")+2:]
+                                                await msg.edit(content = m)
                                         else:
                                             pass
                                 else:
                                     await message.author.send('**Ошибка. Попробуйте еще раз.**')
-                            else:
-                                await message.author.send('**Ошибка.**')
+                        else:
+                            await message.author.send('**Ошибка.**')
 
-                        elif text.find("!remove_good:") != -1:
-                            m = ''
-                            id = int(message.author.id)
-                            info = text.find(',')
-                            if text.find(',') != -1:
-                                name = text[text.find(":")+2:text.find(',')]
-                                amount = text[text.rfind(',')+2:]
-                                result = remove_good(name, id, amount) 
-                            else:
-                                name = text[text.find(":")+2:]
-                                result = remove_good(name, id, 0) 
+                    elif text.find('!add_ex_goods:') != -1:
+                        if text.find(',') == text.find(','):
+                            name = text[text.find(':')+2:text.find(',')]
+                            amount = text[text.find(',')+2:]
+                            id = message.author.id
+                            result = add_old_goods(name, id, amount)
                             if result != 0:
-                                if type(result[0]) != int:
-                                    await message.author.send(">>> Успешно. Товар удален из списка продаваемых.")
-                                    channel = client.get_channel(845345224461123619)
-                                    messages = await channel.history(limit=200).flatten()
-                                    for msg in messages:
-                                        res = msg.content
-                                        if res.find(result[0]) != -1:
-                                            if res.find(name) != -1:
-                                                delete_to = res[res.find(name):]
-                                                text = res[:res.find(name)] + delete_to[delete_to.find('\n')+1:]
-                                                await msg.edit(content = text)
-                                            else:
-                                                await message.author.send('**Ошибка. Попробуйте еще раз.**')
-                                else:
-                                    await message.author.send(">>> Успешно. Несколько товаров удалено из списка продаваемых.")
-                                    channel = client.get_channel(845345224461123619)
-                                    messages = await channel.history(limit=200).flatten()
-                                    for msg in messages:
-                                        res = msg.content
-                                        if res.find(result[1]) != -1:
-                                            delete_to = res[res.find(name):]
-                                            delete_to = delete_to[delete_to.find('-'):]
-                                            res2 = res[:res.find(delete_to)]
-                                            text = res2 + ' - ' + str(result[0]) + ' штук' + delete_to[delete_to.find('\n'):]
-                                            await msg.edit(content = text)
+                                await message.author.send('>>> Успешно. Товар добавлен в список продаваемых товаров.')
+                                channel = client.get_channel(845345224461123619)
+                                messages = await channel.history(limit=200).flatten()
+                                for msg in messages:
+                                    res1 = msg.content.find(str(result[0]))
+                                    res = msg.content
+                                    if res1 != -1:
+                                        leave2 = res[res.find(name):]
+                                        leave1 = res[:res.find(name)]
+                                        leave2 = leave2[leave2.find('штук')-1:]
+                                        another_part = res[res.find(name):]
+                                        position = another_part.find('в наличии ')
+                                        another_part = another_part[:position + 10]
+                                        m = leave1 + another_part + str(result[1]) + leave2
+                                        await msg.edit(content = m)
+                                    else:
+                                        pass
                             else:
                                 await message.author.send('**Ошибка. Попробуйте еще раз.**')
-                    else:
-                        await message.author.send('***Иди нахуй!***')
+                        else:
+                            await message.author.send('**Ошибка.**')
+
+                    elif text.find("!remove_good:") != -1:
+                        m = ''
+                        id = int(message.author.id)
+                        info = text.find(',')
+                        if text.find(',') != -1:
+                            name = text[text.find(":")+2:text.find(',')]
+                            amount = text[text.rfind(',')+2:]
+                            result = remove_good(name, id, amount) 
+                        else:
+                            name = text[text.find(":")+2:]
+                            result = remove_good(name, id, 0) 
+                        if result != 0:
+                            if type(result[0]) != int:
+                                await message.author.send(">>> Успешно. Товар удален из списка продаваемых.")
+                                channel = client.get_channel(845345224461123619)
+                                messages = await channel.history(limit=200).flatten()
+                                for msg in messages:
+                                    res = msg.content
+                                    if res.find(result[0]) != -1:
+                                        if res.find(name) != -1:
+                                            delete_to = res[res.find(name):]
+                                            text = res[:res.find(name)] + delete_to[delete_to.find('\n')+1:]
+                                            await msg.edit(content = text)
+                                        else:
+                                            await message.author.send('**Ошибка. Попробуйте еще раз.**')
+                            else:
+                                await message.author.send(">>> Успешно. Несколько товаров удалено из списка продаваемых.")
+                                channel = client.get_channel(845345224461123619)
+                                messages = await channel.history(limit=200).flatten()
+                                for msg in messages:
+                                    res = msg.content
+                                    if res.find(result[1]) != -1:
+                                        delete_to = res[res.find(name):]
+                                        delete_to = delete_to[delete_to.find('-'):]
+                                        res2 = res[:res.find(delete_to)]
+                                        text = res2 + ' - ' + str(result[0]) + ' штук' + delete_to[delete_to.find('\n'):]
+                                        await msg.edit(content = text)
+                        else:
+                            await message.author.send('**Ошибка. Попробуйте еще раз.**')
+                else:
+                    await message.author.send('***Иди нахуй!***')
 
                 
 client = MyClient()
