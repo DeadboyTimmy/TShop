@@ -3,9 +3,11 @@ import os
 import pymysql.cursors
 import keep_alive
 
+
 keep_alive.keep_alive()
 settings = {'token': os.getenv("TOKEN"), 'id': os.getenv("ID")}
 text_last = []
+
 
 def getConnection():
     tries = 0
@@ -296,23 +298,35 @@ def remove_good(name, id, amount):
         except:
             return 0    
 
-def check_good(name, owner_id):
-    id_shop = 0
+def check_good(name, owner_id):                     #найти ошибку
+    id_shop = ''
+    amount = 0
+    am = 0
     connection = getConnection()
+
     try:
         with connection.cursor() as cursor: 
             sql = "SELECT id FROM Shops WHERE owner_id = %s"
-            cursor.execute(sql, str(id))
+            cursor.execute(sql, str(owner_id))
             rows = cursor.fetchall()
             for row in rows:
-                id_shop = row['name']
-        with connection.cursor() as cursor: 
-            sql = "SELECT * FROM Products WHERE id_shop = %s AND name = %s"
-            cursor.execute(sql, (str(id_shop), name))
-            rows = cursor.fetchall()
-            return 0
+                id_shop = row['id']
     except:
-        return 1
+        return 0
+    try:
+        with connection.cursor() as cursor: 
+            sql = "SELECT amount FROM Products WHERE name = %s AND id_shop = %s"
+            cursor.execute(sql, (name, id_shop))
+            rows = cursor.fetchall()
+            for row in rows:
+                am = row['amount']
+            amount = int(am) + int(amount)
+            if amount != 0:
+                return 0
+            else:
+                return 1
+    except:
+        return 0
 
 def add_old_goods(name, id, amount):
     am = 0
@@ -438,14 +452,12 @@ class MyClient(discord.Client):
                         if text.find(',') != text.rfind(','):
                             tex = text[text.find(':')+2:]
                             parametres = tex.split(',')
-                            print(parametres)
                             name = parametres[0]
                             price = parametres[1]
                             amount = parametres[2]
                             batch = parametres[3]
                             id = message.author.id
                             r = check_good(name, id)
-                            print(r)
                             if r == 0:
                                 await message.author.send('**Проверьте наличие товара в магазине.**')
                             else:
