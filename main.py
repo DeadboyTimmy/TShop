@@ -298,12 +298,11 @@ def remove_good(name, id, amount):
         except:
             return 0    
 
-def check_good(name, owner_id):                     #найти ошибку
+def check_good(name, owner_id):                     
     id_shop = ''
     amount = 0
     am = 0
     connection = getConnection()
-
     try:
         with connection.cursor() as cursor: 
             sql = "SELECT id FROM Shops WHERE owner_id = %s"
@@ -367,6 +366,7 @@ def add_old_goods(name, id, amount):
         return result
     except:
         return 0
+
 
 class MyClient(discord.Client):
     
